@@ -1,0 +1,8 @@
+module(name = "qdrant_cpp_client", version = "0.1.0")
+
+bazel_dep(name = "grpc", version = "1.80.0")
+# Capped at 33.x: grpc 1.80.0 loads @protobuf//bazel:upb_proto_library.bzl,
+# which protobuf removed in 34.x. Bump in lockstep with grpc.
+bazel_dep(name = "protobuf", version = "33.4")
+bazel_dep(name = "rules_cc", version = "0.2.18")
+bazel_dep(name = "rules_proto", version = "7.1.0")

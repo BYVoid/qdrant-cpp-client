@@ -1,0 +1,75 @@
+load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+# Bazel build for qdrant-cpp-client. This exposes a small, hand-written
+# C++ client for Qdrant's gRPC API as a bzlmod target so downstream
+# Bazel projects can depend on it via the Bazel Central Registry.
+#
+# The client speaks to Qdrant over a minimal, hand-written subset of the
+# upstream protobuf API rather than vendoring the full upstream .proto tree.
+# The schema is split into a messages-only proto and a service-only proto
+# that imports it; see qdrant/proto/README.md for the wire-compat contract.
+
+package(default_visibility = ["//visibility:public"])
+
+# Message + enum definitions (qdrant::PointStruct, qdrant::ScoredPoint,
+# qdrant::UpdateStatus, …) and the service definitions (Points, Collections)
+# that import them, kept in separate .proto files.
+proto_library(
+    name = "qdrant_messages_proto",
+    srcs = ["qdrant/proto/qdrant_messages.proto"],
+)
+
+proto_library(
+    name = "qdrant_service_proto",
+    srcs = ["qdrant/proto/qdrant_service.proto"],
+    deps = [":qdrant_messages_proto"],
+)
+
+# C++ message classes for the whole closure (service proto + its imported
+# messages proto). One cc_proto_library over the top proto generates code
+# for every proto_library it transitively pulls in.
+cc_proto_library(
+    name = "qdrant_cc_proto",
+    deps = [":qdrant_service_proto"],
+)
+
+# gRPC service stubs only (grpc_only = True); the message classes and the
+# service proto's own *.pb.h come from :qdrant_cc_proto in deps.
+cc_grpc_library(
+    name = "qdrant_grpc",
+    srcs = [":qdrant_service_proto"],
+    grpc_only = True,
+    deps = [":qdrant_cc_proto"],
+)
+
+# The main qdrant-cpp-client library. Downstream callers use
+# `#include <qdrant/qdrant_client.h>` and link
+# `@qdrant_cpp_client//:qdrant_client`.
+cc_library(
+    name = "qdrant_client",
+    srcs = ["qdrant/qdrant_client.cc"],
+    hdrs = ["qdrant/qdrant_client.h"],
+    # Expose headers at their workspace path so both internal
+    # (`#include "qdrant/qdrant_client.h"`) and external
+    # (`#include <qdrant/qdrant_client.h>`) include forms resolve.
+    strip_include_prefix = "/",
+    deps = [
+        ":qdrant_cc_proto",
+        ":qdrant_grpc",
+        "@grpc//:grpc++",
+    ],
+)
+
+# Compile-only smoke test: confirms the public header compiles on its own
+# (it includes the generated message classes but not the gRPC service
+# stubs) and links against the real library.
+cc_test(
+    name = "qdrant_client_compile_test",
+    size = "small",
+    srcs = ["qdrant/qdrant_client_compile_test.cc"],
+    deps = [":qdrant_client"],
+)

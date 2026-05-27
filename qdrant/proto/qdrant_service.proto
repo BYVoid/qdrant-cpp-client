@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package qdrant;
+
+import "qdrant/proto/qdrant_messages.proto";
+
+service Points {
+  rpc Upsert(UpsertPoints) returns (PointsOperationResponse) {}
+  rpc CreateFieldIndex(CreateFieldIndexCollection) returns (PointsOperationResponse) {}
+  rpc Search(SearchPoints) returns (SearchResponse) {}
+}
+
+service Collections {
+  rpc Create(CreateCollection) returns (CollectionOperationResponse) {}
+  rpc Delete(DeleteCollection) returns (CollectionOperationResponse) {}
+  rpc CollectionExists(CollectionExistsRequest) returns (CollectionExistsResponse) {}
+}
