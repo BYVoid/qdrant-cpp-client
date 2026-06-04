@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "qdrant/proto/qdrant_messages.pb.h"
+#include "qdrant/proto/points.pb.h"
 
 namespace qdrant {
 

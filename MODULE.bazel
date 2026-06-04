@@ -1,4 +1,6 @@
-module(name = "qdrant_cpp_client", version = "0.1.0")
+# Version tracks the upstream Qdrant release whose protos are vendored
+# under qdrant/proto/.
+module(name = "qdrant_cpp_client", version = "1.18.2")
 
 bazel_dep(name = "grpc", version = "1.80.0")
 # Capped at 33.x: grpc 1.80.0 loads @protobuf//bazel:upb_proto_library.bzl,

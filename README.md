@@ -1,17 +1,42 @@
 # qdrant-cpp-client
 
-A small, hand-written C++ gRPC client for [Qdrant](https://qdrant.tech/).
+A small, hand-written C++ gRPC client for [Qdrant](https://qdrant.tech/),
+packaged as a [Bazel](https://bazel.build/) module.
 
-It does **not** vendor Qdrant's full protobuf API. Instead it talks to the
-server over a minimal, hand-maintained subset of the upstream gRPC schema
-(`qdrant/proto/qdrant_messages.proto` plus `qdrant/proto/qdrant_service.proto`)
-covering only the collection and point operations the client needs. See
-[`qdrant/proto/README.md`](qdrant/proto/README.md) for the wire-compatibility
-contract with upstream.
+## Protos: vendored from upstream Qdrant
 
-## Features
+The protobuf schema under `qdrant/proto/` is **not** hand-written — it is
+vendored verbatim from the upstream Qdrant repository:
 
-The public surface is the `qdrant::QdrantClient` class
+- **Source**: `lib/api/src/grpc/proto/` in
+  [qdrant/qdrant **v1.18.2**](https://github.com/qdrant/qdrant/releases/tag/v1.18.2)
+  (downloaded from the release tarball, not a git checkout)
+- **Scope**: the full public, client-facing API — the `Points`,
+  `Collections`, `Snapshots`, root `Qdrant` (health check), and standard
+  `grpc.health.v1.Health` services with all their messages.
+  Cluster-internal service protos (raft, shard transfer, node-to-node
+  point/collection ops) are deliberately excluded; a client never calls
+  them.
+- **Local deviations** (the only ones): import paths are rewritten to the
+  `qdrant/proto/` prefix so the files build from the workspace root, and
+  `qdrant.proto` is trimmed of its internal-service imports. See
+  [`qdrant/proto/README.md`](qdrant/proto/README.md) for the exact file
+  list and the step-by-step upgrade procedure.
+- **License**: the vendored protos are © Qdrant, licensed under
+  [Apache 2.0](qdrant/proto/LICENSE) (copied from the upstream
+  repository).
+
+This module's version (`MODULE.bazel`, currently **1.18.2**) tracks the
+upstream Qdrant release the protos were vendored from.
+
+Because the full schema is vendored, all generated message and stub types
+(`qdrant::QueryPoints`, `qdrant::ScrollPoints`, quantization configs,
+sparse/named vectors, …) are available to downstream code even where the
+convenience wrapper below does not expose them.
+
+## The client wrapper
+
+The hand-written public surface is the `qdrant::QdrantClient` class
 (`qdrant/qdrant_client.h`):
 
 * `EnsureCollection` — create a cosine-distance collection (optionally
@@ -29,11 +54,10 @@ The public surface is the `qdrant::QdrantClient` class
 
 ## Using it from Bazel (bzlmod)
 
-This package is a [Bazel](https://bazel.build/) module. Add it to your
-`MODULE.bazel`:
+Add it to your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "qdrant_cpp_client", version = "0.1.0")
+bazel_dep(name = "qdrant_cpp_client", version = "1.18.2")
 ```
 
 Then depend on the library and include the header:
@@ -57,6 +81,10 @@ client.EnsureCollection(
     });
 ```
 
+To use parts of the API the wrapper does not cover, depend on
+`@qdrant_cpp_client//:qdrant_cc_proto` (messages) and
+`@qdrant_cpp_client//:qdrant_grpc` (service stubs) directly.
+
 The repo builds with C++20 (set in `.bazelrc`).
 
 ## Building and testing this repo
@@ -67,8 +95,8 @@ bazel test //...
 ```
 
 `//:qdrant_client_compile_test` is a compile-only smoke test that confirms the
-public header is self-contained (it forward-declares the one proto type it
-references and pulls in no generated gRPC headers).
+public header is self-contained (it includes only the generated message
+classes, no generated gRPC service stubs).
 
 ## Dependencies
 

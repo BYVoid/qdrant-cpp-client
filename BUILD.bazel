@@ -8,29 +8,45 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 # C++ client for Qdrant's gRPC API as a bzlmod target so downstream
 # Bazel projects can depend on it via the Bazel Central Registry.
 #
-# The client speaks to Qdrant over a minimal, hand-written subset of the
-# upstream protobuf API rather than vendoring the full upstream .proto tree.
-# The schema is split into a messages-only proto and a service-only proto
-# that imports it; see qdrant/proto/README.md for the wire-compat contract.
+# The .proto files under qdrant/proto/ are vendored verbatim from upstream
+# Qdrant (the public, client-facing subset only — cluster-internal service
+# protos are not vendored); see qdrant/proto/README.md for the source tag
+# and the sync procedure.
 
 package(default_visibility = ["//visibility:public"])
 
-# Message + enum definitions (qdrant::PointStruct, qdrant::ScoredPoint,
-# qdrant::UpdateStatus, …) and the service definitions (Points, Collections)
-# that import them, kept in separate .proto files.
+# Message + enum definitions, vendored from upstream. Deps mirror each
+# file's import statements.
 proto_library(
     name = "qdrant_messages_proto",
-    srcs = ["qdrant/proto/qdrant_messages.proto"],
+    srcs = [
+        "qdrant/proto/collections.proto",
+        "qdrant/proto/json_with_int.proto",
+        "qdrant/proto/points.proto",
+        "qdrant/proto/qdrant_common.proto",
+    ],
+    deps = ["@protobuf//:timestamp_proto"],
 )
 
+# Service definitions: Points, Collections, Snapshots, the root Qdrant
+# service (HealthCheck), and the standard grpc.health.v1 Health service.
 proto_library(
     name = "qdrant_service_proto",
-    srcs = ["qdrant/proto/qdrant_service.proto"],
-    deps = [":qdrant_messages_proto"],
+    srcs = [
+        "qdrant/proto/collections_service.proto",
+        "qdrant/proto/health_check.proto",
+        "qdrant/proto/points_service.proto",
+        "qdrant/proto/qdrant.proto",
+        "qdrant/proto/snapshots_service.proto",
+    ],
+    deps = [
+        ":qdrant_messages_proto",
+        "@protobuf//:timestamp_proto",
+    ],
 )
 
-# C++ message classes for the whole closure (service proto + its imported
-# messages proto). One cc_proto_library over the top proto generates code
+# C++ message classes for the whole closure (service protos + their imported
+# messages protos). One cc_proto_library over the top proto generates code
 # for every proto_library it transitively pulls in.
 cc_proto_library(
     name = "qdrant_cc_proto",
@@ -38,7 +54,7 @@ cc_proto_library(
 )
 
 # gRPC service stubs only (grpc_only = True); the message classes and the
-# service proto's own *.pb.h come from :qdrant_cc_proto in deps.
+# service protos' own *.pb.h come from :qdrant_cc_proto in deps.
 cc_grpc_library(
     name = "qdrant_grpc",
     srcs = [":qdrant_service_proto"],

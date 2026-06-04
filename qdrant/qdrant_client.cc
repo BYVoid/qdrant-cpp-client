@@ -11,8 +11,10 @@
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/support/channel_arguments.h>
 
-#include "qdrant/proto/qdrant_messages.pb.h"
-#include "qdrant/proto/qdrant_service.grpc.pb.h"
+#include "qdrant/proto/collections.pb.h"
+#include "qdrant/proto/collections_service.grpc.pb.h"
+#include "qdrant/proto/points.pb.h"
+#include "qdrant/proto/points_service.grpc.pb.h"
 
 namespace qdrant {
 namespace {

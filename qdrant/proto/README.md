@@ -1,32 +1,47 @@
-# Qdrant Minimal Proto
+# Qdrant Protos (vendored)
 
-These are handwritten minimal subsets of Qdrant's official gRPC protobuf API,
-not vendored from upstream. The schema is split in two:
+These files are © Qdrant, licensed under [Apache 2.0](LICENSE) (the
+`LICENSE` file here is copied from the upstream repository root).
 
-- `qdrant_messages.proto` — all message and enum definitions.
-- `qdrant_service.proto` — the `Points` and `Collections` services, importing
-  `qdrant_messages.proto`.
+These .proto files are vendored verbatim from upstream Qdrant
+**v1.18.2** (`lib/api/src/grpc/proto/` in
+https://github.com/qdrant/qdrant/archive/refs/tags/v1.18.2.tar.gz),
+with two deliberate deviations:
 
-Together they keep only the messages, enums, and RPCs used by the client:
+1. **Import paths**: upstream uses bare imports (`import
+   "collections.proto"`); ours are rewritten to
+   `import "qdrant/proto/collections.proto"` so the files build from the
+   workspace root without `strip_import_prefix` (which would emit
+   generic top-level headers like `points.pb.h` that could collide with
+   downstream projects).
+2. **`qdrant.proto` is trimmed**: upstream's root file imports the
+   cluster-internal service protos (raft_service,
+   points_internal_service, collections_internal_service,
+   qdrant_internal_service, shard_snapshots_service,
+   storage_read_service, telemetry_internal) purely to aggregate them
+   into one descriptor. Those are node-to-node APIs a client never
+   calls, so they are not vendored and the imports are dropped; only
+   the root `Qdrant` service (HealthCheck) is kept.
 
-- `Collections.CollectionExists`
-- `Collections.Delete`
-- `Collections.Create`
-- `Points.CreateFieldIndex`
-- `Points.Upsert`
-- Dense vectors, point IDs, payload values, collection config, and field-index
-  types required by those calls
+Vendored set (the full public, client-facing API):
 
-The source of truth is Qdrant's upstream protobuf definitions:
+- `qdrant_common.proto` — PointId, Filter/Condition/Match, geo, ranges
+- `json_with_int.proto` — `qdrant.Value`/`Struct`/`ListValue` (payloads)
+- `collections.proto` + `collections_service.proto` — `Collections` service
+- `points.proto` + `points_service.proto` — `Points` service
+- `snapshots_service.proto` — `Snapshots` service
+- `health_check.proto` — standard `grpc.health.v1.Health` service
+- `qdrant.proto` — root `Qdrant` service (trimmed, see above)
 
-- https://github.com/qdrant/qdrant/blob/master/lib/api/src/grpc/proto/points.proto
-- https://github.com/qdrant/qdrant/blob/master/lib/api/src/grpc/proto/points_service.proto
-- https://github.com/qdrant/qdrant/blob/master/lib/api/src/grpc/proto/collections.proto
-- https://github.com/qdrant/qdrant/blob/master/lib/api/src/grpc/proto/collections_service.proto
-- https://github.com/qdrant/qdrant/blob/master/lib/api/src/grpc/proto/json_with_int.proto
+## Updating to a new upstream release
 
-When updating this file, preserve protobuf wire compatibility with upstream:
-field numbers, field types, enum numeric values, package name, service names,
-and RPC request/response types must match the official definitions. Unused
-optional fields can be omitted from this local subset, but existing field numbers
-must not be renumbered.
+1. Download `https://github.com/qdrant/qdrant/archive/refs/tags/v<X.Y.Z>.tar.gz`
+   and extract `lib/api/src/grpc/proto/`.
+2. Copy the files listed above over the ones here (skip `qdrant.proto`).
+3. Rewrite local imports:
+   `sed -i '' -E 's|^import "(collections\|points\|qdrant_common\|json_with_int)|import "qdrant/proto/\1|' *.proto`
+4. Diff upstream `qdrant.proto` against our trimmed copy and port any
+   changes to the root service / health-check messages.
+5. Copy the tarball's root `LICENSE` over the one here if it changed.
+6. Update the version in this README and in `MODULE.bazel`, then run
+   `bazel test //...`.

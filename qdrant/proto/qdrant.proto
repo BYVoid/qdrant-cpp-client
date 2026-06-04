@@ -1,0 +1,22 @@
+// Vendored from qdrant v1.18.2 lib/api/src/grpc/proto/qdrant.proto.
+// Trimmed: upstream imports the cluster-internal service protos
+// (raft_service, points_internal_service, collections_internal_service,
+// qdrant_internal_service, shard_snapshots_service, storage_read_service)
+// purely to aggregate them into one descriptor; a client only needs the
+// root Qdrant service defined below, so those imports are dropped.
+syntax = "proto3";
+
+package qdrant;
+option csharp_namespace = "Qdrant.Client.Grpc";
+
+service Qdrant {
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckReply) {}
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckReply {
+  string title = 1;
+  string version = 2;
+  optional string commit = 3;
+}
